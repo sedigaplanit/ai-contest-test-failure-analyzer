@@ -1,0 +1,1 @@
+{"root":["./src/app.tsx","./src/main.tsx","./src/types.ts","./src/lib/ai.ts","./src/lib/cache.ts","./src/lib/github.ts","./src/lib/hash.ts","./src/lib/issue.ts","./src/lib/parsers.ts","./src/lib/prompt.ts","./src/lib/storage.ts","./src/lib/trace.ts"],"version":"5.9.3"}
