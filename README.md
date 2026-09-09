@@ -7,6 +7,7 @@ Local web app for analyzing failed test reports from uploads or GitHub Actions r
 - Upload report files, folders, or ZIP archives
 - Pull artifacts from GitHub Actions runs
 - Normalize failures across multiple test report formats
+- Optionally upload project source files or folders for better AI grounding
 - Group repeated failures under common issue types
 - Show filtered, collapsible failed tests under each issue group
 - Generate shared AI suggestions for common failures
@@ -68,8 +69,9 @@ This builds the app and serves it through `server.js` with the same local proxy 
    `Manual Upload`
    `GitHub CI Fetch`
 4. Load failed test results.
-5. Select `Analyze Failures`.
-6. Review grouped issue-type suggestions and create a GitHub issue if needed.
+5. Optionally upload project context files or folders in `Step 2.5: Project Context`.
+6. Select `Analyze Failures`.
+7. Review grouped issue-type suggestions, including any matched project evidence, and create a GitHub issue if needed.
 
 ## Recommended GitHub Token Scopes
 
@@ -83,6 +85,14 @@ This builds the app and serves it through `server.js` with the same local proxy 
 
 - Drop a ZIP archive, loose files, or an extracted report folder
 - The app will scan the contents and detect supported report files automatically
+- You can also upload project files or folders so suggestions can reference matching tests, helpers, app code, or config
+
+### Project Context Upload
+
+- Optional input for improving fix suggestions beyond stack traces alone
+- Best used with relevant test files, fixtures, helpers, app code, or config files
+- Currently supports uploaded files and folders; it does not fetch repository source from GitHub yet
+- The local analysis cache includes the project-context fingerprint, so adding or changing context forces a fresh analysis
 
 ### GitHub CI Fetch
 
@@ -123,6 +133,7 @@ npm run local
 ```text
 src/App.tsx          Main UI and workflow
 src/lib/parsers.ts   Report parsing and normalization
+src/lib/context.ts   Project-context collection and failure matching
 src/lib/ai.ts        Amplify/OpenAI-compatible analysis client
 src/lib/github.ts    GitHub workflow, run, artifact, and issue helpers
 src/lib/issue.ts     Grouped GitHub issue draft generation
@@ -132,5 +143,6 @@ server.js            Local static server and Amplify proxy
 ## Notes
 
 - Analysis results are cached locally
+- Cache entries are scoped to both the report input and any uploaded project context
 - Failed tests are grouped before sending them to the LLM
 - The UI is optimized for local triage rather than hosted multi-user deployment

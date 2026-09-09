@@ -24,15 +24,22 @@ export function buildIssueDraft(
     `Confidence: ${Math.round(suggestedGroup.confidence * 100)}%`,
     `Severity: ${titleCase(suggestedGroup.severity)}`,
     `Likely flaky: ${suggestedGroup.isFlakyLikely ? "yes" : "no"}`,
+    `Project context coverage: ${titleCase(suggestedGroup.contextCoverage)}`,
     "",
+    suggestedGroup.graphPaths.length > 0 ? `## Graph Paths Used` : "",
+    ...suggestedGroup.graphPaths.map((path) => `- ${path}`),
+    suggestedGroup.graphPaths.length > 0 ? "" : "",
     `## Affected Tests`,
     ...suggestedGroup.tests.map((test) => `- ${test.name} (${test.occurrences} occurrence(s))`),
     "",
+    suggestedGroup.contextFiles.length > 0 ? `## Project Context Used` : "",
+    ...suggestedGroup.contextFiles.map((file) => `- ${file.symbolName ?? file.path}${file.startLine ? ` @ ${file.path}:${file.startLine}-${file.endLine ?? file.startLine}` : ` (${file.path})`} (${file.role}${file.symbolKind ? `, ${file.symbolKind}` : ""}): ${file.reason}`),
+    suggestedGroup.contextFiles.length > 0 ? "" : "",
     `## Root Cause Summary`,
     ...suggestedGroup.rootCauseSummaries.map((summary) => `- ${summary}`),
     "",
     `## Recommended Fixes`,
-    ...suggestedGroup.recommendedFixes.map((fix) => `- ${fix.title}: ${fix.description}`),
+    ...suggestedGroup.recommendedFixes.flatMap((fix) => formatFixForIssue(fix)),
     "",
     suggestedGroup.why.length > 0 ? `## Why This Was Grouped Together` : "",
     ...suggestedGroup.why.map((reason) => `- ${reason}`),
@@ -49,6 +56,35 @@ export function buildIssueDraft(
     .join("\n");
 
   return { title, body };
+}
+
+function formatFixForIssue(fix: SuggestedIssueGroup["recommendedFixes"][number]): string[] {
+  const lines = [`### ${fix.title}`, fix.description];
+
+  if (fix.filePath?.trim()) {
+    lines.push(`- File: \`${fix.filePath.trim()}\``);
+  }
+
+  if (fix.locationHint?.trim()) {
+    lines.push(`- Where: ${fix.locationHint.trim()}`);
+  }
+
+  if (fix.changeMode) {
+    lines.push(`- Change: ${titleCase(fix.changeMode)}`);
+  }
+
+  if (fix.existingCode?.trim()) {
+    lines.push("", "Current code", "```text", fix.existingCode.trim(), "```");
+  }
+
+  if (fix.proposedCode?.trim()) {
+    lines.push("", "Suggested code", "```text", fix.proposedCode.trim(), "```");
+  } else if (fix.snippet?.trim()) {
+    lines.push("", "Suggested code", "```text", fix.snippet.trim(), "```");
+  }
+
+  lines.push("");
+  return lines;
 }
 
 function titleCase(input: string): string {

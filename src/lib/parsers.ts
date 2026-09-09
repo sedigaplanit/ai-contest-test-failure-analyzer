@@ -456,9 +456,8 @@ function parsePlaywrightJson(fileName: string, jsonText: string, source: Normali
 }
 
 function parsePlaywrightHtmlReport(fileName: string, htmlText: string, source: NormalizedTestFailure["source"]): ParseResult {
-  const marker = "data:application/zip;base64,";
-  const markerStart = htmlText.indexOf(marker);
-  if (markerStart === -1) {
+  const embeddedZipBase64 = extractPlaywrightEmbeddedZipBase64(htmlText);
+  if (!embeddedZipBase64) {
     return {
       framework: "playwright",
       failures: [],
@@ -466,9 +465,7 @@ function parsePlaywrightHtmlReport(fileName: string, htmlText: string, source: N
     };
   }
 
-  const scriptEnd = htmlText.indexOf("</script>", markerStart);
-  const base64 = htmlText.slice(markerStart + marker.length, scriptEnd === -1 ? htmlText.length : scriptEnd).trim();
-  const embeddedEntries = unzipSync(new Uint8Array(base64ToBytes(base64)));
+  const embeddedEntries = unzipSync(new Uint8Array(base64ToBytes(embeddedZipBase64)));
 
   const embeddedFileReports = new Map<string, { fileName: string; tests: any[] }>();
   const summaryFileReports = new Map<string, { fileName: string; tests: any[] }>();
@@ -708,8 +705,43 @@ function buildFailureSignature(failure: NormalizedTestFailure): string {
   return `${failure.framework}|${normalizeErrorText(failure.errorMessage)}|${normalizeErrorText(failure.executionStep ?? "")}`;
 }
 
+function extractPlaywrightEmbeddedZipBase64(htmlText: string): string | null {
+  const doc = new DOMParser().parseFromString(htmlText, "text/html");
+  const embeddedNode = doc.getElementById("playwrightReportBase64");
+  const embeddedText = embeddedNode?.textContent?.trim();
+  if (embeddedText) {
+    return normalizeEmbeddedBase64Payload(embeddedText);
+  }
+
+  const elementMatch = htmlText.match(/id=["']playwrightReportBase64["'][^>]*>([\s\S]*?)<\/[^>]+>/i);
+  if (elementMatch?.[1]) {
+    return normalizeEmbeddedBase64Payload(elementMatch[1]);
+  }
+
+  const dataUriMatch = htmlText.match(/data:application\/zip;base64,([A-Za-z0-9+/=\s]+)/i);
+  if (dataUriMatch?.[1]) {
+    return normalizeEmbeddedBase64Payload(dataUriMatch[1]);
+  }
+
+  return null;
+}
+
+function normalizeEmbeddedBase64Payload(value: string): string {
+  const normalized = value
+    .replace(/^data:application\/zip;base64,/i, "")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&amp;/g, "&")
+    .replace(/\s+/g, "")
+    .trim();
+
+  const base64Match = normalized.match(/[A-Za-z0-9+/=]+/);
+  return base64Match?.[0] ?? normalized;
+}
+
 function base64ToBytes(input: string): Uint8Array {
-  const binary = atob(input);
+  const sanitizedInput = input.replace(/\s+/g, "").trim();
+  const binary = atob(sanitizedInput);
   const bytes = new Uint8Array(binary.length);
   for (let index = 0; index < binary.length; index += 1) {
     bytes[index] = binary.charCodeAt(index);
